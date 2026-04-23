@@ -18,6 +18,10 @@ WORKDIR /app
 
 COPY --from=builder /root/.local /root/.local
 
+COPY backend/main.py backend/models.py backend/seed_data.py backend/achievement_engine.py ./
+COPY backend/routers ./routers
+COPY backend/scripts ./scripts
+
 ENV PATH=/root/.local/bin:$PATH \
     PYTHONUNBUFFERED=1
 
