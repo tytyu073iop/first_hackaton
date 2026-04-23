@@ -1,6 +1,6 @@
 // filepath: frontend/src/components/GameMap.jsx
-import { useEffect, useMemo, useState } from "react";
-import Map, { Source, Layer, Popup, NavigationControl } from "react-map-gl/maplibre";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Map, { Source, Layer, NavigationControl } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const MINSK_CENTER = { longitude: 27.5615, latitude: 53.9045 };
@@ -49,8 +49,9 @@ function pointsToGeoJSON(items, keyExtras = {}) {
 }
 
 export default function GameMap({ hexes, partners, pending, onConsume, onSelectPartner }) {
-  const [popup, setPopup] = useState(null);
   const [pulse, setPulse] = useState(8);
+  const [selectedId, setSelectedId] = useState(null);
+  const mapRef = useRef(null);
 
   const hexGeoJSON = useMemo(() => hexToGeoJSON(hexes), [hexes]);
   const partnersGeoJSON = useMemo(() => pointsToGeoJSON(partners), [partners]);
@@ -67,6 +68,7 @@ export default function GameMap({ hexes, partners, pending, onConsume, onSelectP
 
   return (
     <Map
+      ref={mapRef}
       initialViewState={{
         longitude: MINSK_CENTER.longitude,
         latitude: MINSK_CENTER.latitude,
@@ -77,29 +79,18 @@ export default function GameMap({ hexes, partners, pending, onConsume, onSelectP
       interactiveLayerIds={["partners-circle", "pending-circle"]}
       onClick={(e) => {
         const f = e.features?.[0];
-        if (!f) {
-          setPopup(null);
-          return;
-        }
+        if (!f) return;
         if (f.layer.id === "pending-circle") {
-          setPopup({
-            lngLat: e.lngLat,
-            name: f.properties.name,
-            category: f.properties.category,
-            cashback: f.properties.cashback,
-            pendingId: f.properties.pending_id,
-          });
+          if (onConsume && f.properties.pending_id) {
+            onConsume(f.properties.pending_id);
+          }
         } else if (f.layer.id === "partners-circle") {
-          const name = f.properties.name;
-          const partnerId = f.properties.partner_id;
-          setPopup({
-            lngLat: e.lngLat,
-            name,
-            category: f.properties.category,
-            cashback: f.properties.cashback,
-            pendingId: null,
-          });
-          if (onSelectPartner) onSelectPartner({ id: partnerId, name });
+          setSelectedId(f.properties.partner_id);
+          const [lng, lat] = f.geometry.coordinates;
+          mapRef.current?.flyTo({ center: [lng, lat], zoom: Math.max(mapRef.current.getZoom(), 14), duration: 600 });
+          if (onSelectPartner) {
+            onSelectPartner({ id: f.properties.partner_id, name: f.properties.name });
+          }
         }
       }}
     >
@@ -153,6 +144,18 @@ export default function GameMap({ hexes, partners, pending, onConsume, onSelectP
             "circle-stroke-width": 1.5,
           }}
         />
+        <Layer
+          id="partners-selected"
+          type="circle"
+          filter={["==", ["get", "partner_id"], selectedId ?? "__none__"]}
+          paint={{
+            "circle-radius": 12,
+            "circle-color": "#FFD60A",
+            "circle-opacity": 0,
+            "circle-stroke-color": "#FFD60A",
+            "circle-stroke-width": 3,
+          }}
+        />
       </Source>
 
       <Source id="pending" type="geojson" data={pendingGeoJSON}>
@@ -180,43 +183,6 @@ export default function GameMap({ hexes, partners, pending, onConsume, onSelectP
         />
       </Source>
 
-      {popup && (
-        <Popup
-          longitude={popup.lngLat.lng}
-          latitude={popup.lngLat.lat}
-          anchor="bottom"
-          onClose={() => setPopup(null)}
-          closeOnClick={false}
-        >
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>{popup.name}</div>
-          <div style={{ fontSize: 12 }}>Кэшбэк: {popup.cashback}%</div>
-          <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
-            Категория: {popup.category}
-          </div>
-          {popup.pendingId && onConsume && (
-            <button
-              onClick={() => {
-                onConsume(popup.pendingId);
-                setPopup(null);
-              }}
-              style={{
-                marginTop: 8,
-                width: "100%",
-                background: "#FFD60A",
-                color: "#0d0d1a",
-                border: "none",
-                borderRadius: 6,
-                padding: "6px 10px",
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Открой меня!
-            </button>
-          )}
-        </Popup>
-      )}
     </Map>
   );
 }

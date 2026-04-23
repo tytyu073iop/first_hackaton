@@ -68,7 +68,13 @@ export function useGameState(playerId) {
               const f = fresh[0];
               setNotification({
                 show: true,
-                bank: { merchant: f.partner_name, amount: f.amount, mcc: f.category },
+                bank: {
+                  merchant: f.partner_name,
+                  amount: f.amount,
+                  mcc: f.category,
+                  hexAlreadyUnlocked: f.hex_already_unlocked,
+                  cashbackPercent: f.cashback_percent,
+                },
               });
               setTimeout(() => setNotification({ show: false }), 4500);
             }
@@ -129,6 +135,8 @@ export function useGameState(playerId) {
         setNotification({
           show: true,
           hexUnlocked: res.hex_unlocked,
+          hexAlreadyUnlocked: res.hex_already_unlocked,
+          partnerName: res.partner?.name,
           reward: res.reward,
           achievements: res.new_achievements || [],
         });

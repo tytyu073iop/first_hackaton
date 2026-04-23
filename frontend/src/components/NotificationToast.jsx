@@ -2,7 +2,7 @@
 export default function NotificationToast({ notification }) {
   if (!notification || !notification.show) return null;
 
-  const { hexUnlocked, reward, achievements, error, bank, message } = notification;
+  const { hexUnlocked, hexAlreadyUnlocked, partnerName, reward, achievements, error, bank, message } = notification;
 
   return (
     <>
@@ -53,6 +53,17 @@ export default function NotificationToast({ notification }) {
                     🎁 {reward.label}
                   </div>
                 )}
+              </>
+            )}
+
+            {!hexUnlocked && hexAlreadyUnlocked && reward?.label && (
+              <>
+                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
+                  💳 Кэшбэк активирован{partnerName ? ` в ${partnerName}` : ""}
+                </div>
+                <div style={{ color: "#fff", fontSize: 14, marginBottom: 6 }}>
+                  🎁 {reward.label}
+                </div>
               </>
             )}
 
@@ -127,7 +138,9 @@ function BankPush({ bank }) {
           −{Number(bank.amount).toFixed(2)} BYN · карта *1234
         </div>
         <div style={{ fontSize: 12, color: "#E30613", marginTop: 4, fontWeight: 600 }}>
-          🔔 Новая территория на карте — открой её!
+          {bank.hexAlreadyUnlocked
+            ? `💳 Активируй кэшбэк${bank.cashbackPercent ? ` ${bank.cashbackPercent}%` : ""} в уведомлении`
+            : "🔔 Новая территория на карте — открой её!"}
         </div>
       </div>
     </div>

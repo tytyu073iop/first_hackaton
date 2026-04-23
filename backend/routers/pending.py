@@ -56,9 +56,6 @@ def create_pending(body: PendingIn, db: Session = Depends(get_db)):
     if not partner:
         raise HTTPException(status_code=404, detail=f"Партнёр '{body.merchant_name}' не найден")
 
-    if _active_unlock(db, body.player_id, partner.hex_id):
-        return {"created": False, "reason": "already_unlocked"}
-
     existing = db.query(PendingTransaction).filter_by(
         player_id=body.player_id,
         partner_id=partner.id,
@@ -105,6 +102,7 @@ def list_pending(player_id: str, db: Session = Depends(get_db)):
             "lat": p.lat,
             "lng": p.lng,
             "hex_id": p.hex_id,
+            "hex_already_unlocked": _active_unlock(db, player_id, p.hex_id) is not None,
             "amount": i.amount,
             "created_at": i.created_at.isoformat(),
         })
@@ -178,6 +176,7 @@ def consume_pending(pending_id: int, db: Session = Depends(get_db)):
 
     return {
         "hex_unlocked": hex_unlocked,
+        "hex_already_unlocked": hex_unlocked is None,
         "reward": {
             "type": "cashback",
             "value": partner.cashback_percent,
@@ -242,9 +241,6 @@ def admin_push(
         partner = db.query(Partner).filter_by(name=body.merchant_name).first()
     if not partner:
         raise HTTPException(status_code=404, detail="Партнёр не найден")
-
-    if _active_unlock(db, body.player_id, partner.hex_id):
-        return {"created": False, "reason": "already_unlocked"}
 
     existing = db.query(PendingTransaction).filter_by(
         player_id=body.player_id,
