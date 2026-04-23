@@ -1,21 +1,32 @@
-version: "3.9"
 services:
   backend:
-    image: python:3.11-slim
-    working_dir: /app
-    volumes:
-      - ./backend:/app
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
-    command: >
-      sh -c "pip install -r requirements.txt -q &&
-             uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
-  frontend:
-    image: node:20-slim
-    working_dir: /app
     volumes:
-      - ./frontend:/app
+      - backend_bucket:/data
+    environment:
+      - DATABASE_URL=sqlite:////data/game.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     ports:
       - "5173:5173"
-    command: >
-      sh -c "npm install --silent && npm run dev"
+    environment:
+      - VITE_API_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  backend_bucket:
