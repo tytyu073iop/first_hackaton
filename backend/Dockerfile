@@ -19,7 +19,7 @@ WORKDIR /app
 
 COPY --from=builder /root/.local /root/.local
 
-COPY backend/main.py backend/models.py backend/seed_data.py backend/achievement_engine.py ./
+COPY backend/main.py backend/models.py backend/seed_data.py backend/achievement_engine.py backend/partners_osm.json ./
 COPY backend/routers ./routers
 COPY backend/scripts ./scripts
 
@@ -28,4 +28,4 @@ ENV PATH=/root/.local/bin:$PATH \
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "main.py"]

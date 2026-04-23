@@ -30,6 +30,7 @@ def on_startup():
     init_db()
     db = SessionLocal()
     try:
+        print("Seeding partners...")
         seed_partners(db)
     finally:
         db.close()

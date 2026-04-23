@@ -219,6 +219,7 @@ def seed_partners(session: Session):
     """Создаёт партнёров. Если есть partners_osm.json — берём его (реальные точки
     из OpenStreetMap). Иначе — встроенный PARTNERS_DATA.
     hex_id вычисляется из lat/lng. На каждый гекс — не более MAX_PARTNERS_PER_HEX точек."""
+    print(f"Total partners was: {len(PARTNERS_DATA)}")
     osm = _load_osm_partners()
     if osm is not None:
         prepared = []
@@ -260,15 +261,22 @@ def seed_partners(session: Session):
 
     prepared = []
     for name, cat, mcc, lat, lng, cb in PARTNERS_DATA:
+        print(f"Preparing partner '{name}' at ({lat}, {lng}) with category '{cat}' and MCC {mcc}")
         prepared.append({
             "name": name, "category": cat, "mcc_code": mcc,
             "lat": lat, "lng": lng, "cashback_percent": cb,
             "hex_id": hex_id_for_point(lat, lng),
         })
-    for item in _thin_per_hex(prepared):
+    print(f"Total partners was: {len(PARTNERS_DATA)}")
+    print(f"Prepared {len(prepared)} partners, thinning to max {MAX_PARTNERS_PER_HEX} per hex...")
+    tph = _thin_per_hex(prepared)
+    print(f"{len(tph)} partners after thinning:")
+    for item in tph:
         exists = session.query(Partner).filter_by(name=item["name"]).first()
         if exists:
+            print(f"Partner '{item['name']}' already exists, skipping.")
             continue
+        print(f"Adding partner '{item['name']}' at ({item['lat']}, {item['lng']}) in hex '{item['hex_id']}'")
         session.add(Partner(
             hex_id=item["hex_id"], name=item["name"], category=item["category"],
             mcc_code=item["mcc_code"], lat=item["lat"], lng=item["lng"],
