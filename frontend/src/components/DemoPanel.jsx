@@ -44,9 +44,13 @@ export default function DemoPanel({
   const [partnerId, setPartnerId] = useState("");
   const [amount, setAmount] = useState("25");
   const [rewardsOpen, setRewardsOpen] = useState(false);
+  const [rewardsTab, setRewardsTab] = useState("active");
   const [redeemedFlash, setRedeemedFlash] = useState(null);
   const amountRef = useRef(null);
   const activeRewards = rewards?.active ?? [];
+  const usedRewards = rewards?.used ?? [];
+  const expiredRewards = rewards?.expired ?? [];
+  const inactiveRewards = [...usedRewards, ...expiredRewards];
 
   function handleRedeem(r) {
     if (!onRedeem) return;
@@ -128,7 +132,7 @@ export default function DemoPanel({
               🔔 {pendingCount}
             </span>
           )}
-          {(activeRewards.length > 0 || rewardsOpen) && (
+          {(activeRewards.length > 0 || inactiveRewards.length > 0 || rewardsOpen) && (
             <button
               onClick={() => setRewardsOpen((v) => !v)}
               style={{
@@ -235,82 +239,174 @@ export default function DemoPanel({
             border: "1px solid #7B61FF",
             borderRadius: 10,
             padding: 10,
-            maxHeight: 220,
+            maxHeight: 260,
             overflowY: "auto",
           }}
         >
-          <div style={{ fontSize: 12, color: "#aaa", marginBottom: 6 }}>
-            Активные промокоды
+          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+            {[
+              { key: "active", label: `Активные (${activeRewards.length})` },
+              { key: "inactive", label: `Неактивные (${inactiveRewards.length})` },
+            ].map((t) => {
+              const selected = rewardsTab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setRewardsTab(t.key)}
+                  style={{
+                    flex: 1,
+                    background: selected ? "#7B61FF" : "transparent",
+                    color: selected ? "#fff" : "#aaa",
+                    border: "1px solid #7B61FF",
+                    borderRadius: 8,
+                    padding: "6px 8px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
-          {activeRewards.length === 0 && (
-            <div style={{ fontSize: 12, color: "#666" }}>Пусто</div>
-          )}
-          {activeRewards.map((r) => {
-            const expDays = Math.max(
-              0,
-              Math.ceil((new Date(r.expires_at) - new Date()) / 86400000)
-            );
-            return (
-              <div
-                key={r.id}
-                style={{
-                  borderBottom: "1px solid #1f1f33",
-                  padding: "8px 0",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontWeight: 600, color: "#fff", fontSize: 13 }}>
-                    {r.title}
-                  </div>
+
+          {rewardsTab === "active" && (
+            <>
+              {activeRewards.length === 0 && (
+                <div style={{ fontSize: 12, color: "#666" }}>Пусто</div>
+              )}
+              {activeRewards.map((r) => {
+                const expDays = Math.max(
+                  0,
+                  Math.ceil((new Date(r.expires_at) - new Date()) / 86400000)
+                );
+                return (
                   <div
+                    key={r.id}
                     style={{
-                      fontFamily: "monospace",
-                      fontSize: 12,
-                      color: "#7B61FF",
-                      letterSpacing: 1,
+                      borderBottom: "1px solid #1f1f33",
+                      padding: "8px 0",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
                     }}
                   >
-                    {r.code}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: "#fff", fontSize: 13 }}>
+                        {r.title}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          color: "#7B61FF",
+                          letterSpacing: 1,
+                        }}
+                      >
+                        {r.code}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#666" }}>
+                        осталось {expDays} дн.
+                      </div>
+                    </div>
+                    {redeemedFlash && redeemedFlash.id === r.id ? (
+                      <span
+                        style={{
+                          color: "#7CFFB2",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        ✓ {redeemedFlash.text}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleRedeem(r)}
+                        style={{
+                          background: "transparent",
+                          color: "#7B61FF",
+                          border: "1px solid #7B61FF",
+                          borderRadius: 6,
+                          padding: "4px 10px",
+                          fontSize: 12,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        использовать
+                      </button>
+                    )}
                   </div>
-                  <div style={{ fontSize: 11, color: "#666" }}>
-                    осталось {expDays} дн.
+                );
+              })}
+            </>
+          )}
+
+          {rewardsTab === "inactive" && (
+            <>
+              {inactiveRewards.length === 0 && (
+                <div style={{ fontSize: 12, color: "#666" }}>Пусто</div>
+              )}
+              {inactiveRewards.map((r) => {
+                const isUsed = !!r.used_at;
+                const statusText = isUsed
+                  ? `использован ${new Date(r.used_at).toLocaleDateString()}`
+                  : `истёк ${new Date(r.expires_at).toLocaleDateString()}`;
+                const statusColor = isUsed ? "#7CFFB2" : "#E07A5F";
+                return (
+                  <div
+                    key={r.id}
+                    style={{
+                      borderBottom: "1px solid #1f1f33",
+                      padding: "8px 0",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
+                      opacity: 0.7,
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          color: "#ccc",
+                          fontSize: 13,
+                          textDecoration: "line-through",
+                        }}
+                      >
+                        {r.title}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          color: "#666",
+                          letterSpacing: 1,
+                        }}
+                      >
+                        {r.code}
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        color: statusColor,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {isUsed ? "✓" : "⌛"} {statusText}
+                    </span>
                   </div>
-                </div>
-                {redeemedFlash && redeemedFlash.id === r.id ? (
-                  <span
-                    style={{
-                      color: "#7CFFB2",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    ✓ {redeemedFlash.text}
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => handleRedeem(r)}
-                    style={{
-                      background: "transparent",
-                      color: "#7B61FF",
-                      border: "1px solid #7B61FF",
-                      borderRadius: 6,
-                      padding: "4px 10px",
-                      fontSize: 12,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    использовать
-                  </button>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </>
+          )}
         </div>
       )}
     </div>

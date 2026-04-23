@@ -24,7 +24,8 @@
       "Bash(curl -s -X POST http://127.0.0.1:8765/api/pending -H 'Content-Type: application/json' --data-binary '{\"player_id\":\"smoke_pending_player\",\"merchant_name\":\"x\",\"mcc_code\":\"5999\",\"amount\":20,\"partner_id\":177}')",
       "Bash(curl -s http://127.0.0.1:8765/api/pending/smoke_pending_player)",
       "Bash(curl -s -X POST http://127.0.0.1:8765/api/transaction -H 'Content-Type: application/json' --data-binary '{\"player_id\":\"smoke_geo_player\",\"merchant_name\":\"x\",\"mcc_code\":\"5999\",\"amount\":20,\"partner_id\":__TRACKED_VAR__}' done echo 'open 7 hexes done; checking achievements:' curl -s http://127.0.0.1:8765/api/rewards/smoke_geo_player)",
-      "Bash(curl -s -X POST http://127.0.0.1:8765/api/transaction -H 'Content-Type: application/json' --data-binary '{\"player_id\":\"smoke_line_player\",\"merchant_name\":\"x\",\"mcc_code\":\"5999\",\"amount\":20,\"partner_id\":__TRACKED_VAR__}' done curl -s http://127.0.0.1:8765/api/rewards/smoke_line_player)"
+      "Bash(curl -s -X POST http://127.0.0.1:8765/api/transaction -H 'Content-Type: application/json' --data-binary '{\"player_id\":\"smoke_line_player\",\"merchant_name\":\"x\",\"mcc_code\":\"5999\",\"amount\":20,\"partner_id\":__TRACKED_VAR__}' done curl -s http://127.0.0.1:8765/api/rewards/smoke_line_player)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('partners_osm.json',encoding='utf-8'\\)\\); print\\(len\\(d\\)\\); lats=[x['lat'] for x in d]; lngs=[x['lng'] for x in d]; print\\('lat',min\\(lats\\),max\\(lats\\)\\); print\\('lng',min\\(lngs\\),max\\(lngs\\)\\)\")"
     ],
     "additionalDirectories": [
       "d:\\work\\python\\Final_try\\backend"

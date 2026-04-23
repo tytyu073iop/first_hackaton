@@ -80,6 +80,19 @@ export function useGameState(playerId) {
     return () => clearInterval(id);
   }, [playerId]);
 
+  useEffect(() => {
+    if (!playerId) return;
+    const id = setInterval(() => {
+      fetchHexes(playerId)
+        .then((hx) => {
+          setHexes(hx.hexes || []);
+          setStats(hx.stats || { total: 0, unlocked: 0, achievements_count: 0 });
+        })
+        .catch(() => {});
+    }, 10000);
+    return () => clearInterval(id);
+  }, [playerId]);
+
   const submitDeferred = useCallback(
     async (merchantName, amount, mcc, partnerId) => {
       if (!playerId) return;

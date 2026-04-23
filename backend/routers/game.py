@@ -10,7 +10,7 @@ from achievement_engine import AchievementEngine
 
 router = APIRouter(prefix="/api")
 
-HEX_TTL = timedelta(days=7)
+HEX_TTL = timedelta(minutes=1)
 
 
 def get_db():
@@ -167,24 +167,46 @@ def post_transaction(tx: TransactionIn, db: Session = Depends(get_db)):
     }
 
 
+def _point_in_polygon(lat: float, lng: float, vertices) -> bool:
+    """Ray casting для точки в многоугольнике. vertices = [[lat, lng], ...]."""
+    inside = False
+    n = len(vertices)
+    j = n - 1
+    for i in range(n):
+        yi, xi = vertices[i][0], vertices[i][1]
+        yj, xj = vertices[j][0], vertices[j][1]
+        intersects = ((yi > lat) != (yj > lat)) and (
+            lng < (xj - xi) * (lat - yi) / ((yj - yi) or 1e-12) + xi
+        )
+        if intersects:
+            inside = not inside
+        j = i
+    return inside
+
+
 @router.get("/partners")
 def get_partners(db: Session = Depends(get_db)):
     partners = db.query(Partner).order_by(Partner.name).all()
-    return {
-        "partners": [
-            {
-                "id": p.id,
-                "name": p.name,
-                "category": p.category,
-                "mcc_code": p.mcc_code,
-                "lat": p.lat,
-                "lng": p.lng,
-                "cashback_percent": p.cashback_percent,
-                "hex_id": p.hex_id,
-            }
-            for p in partners
-        ]
-    }
+    grid_by_id = {h["hex_id"]: h for h in hex_grid_minsk()}
+
+    out = []
+    for p in partners:
+        h = grid_by_id.get(p.hex_id)
+        if not h:
+            continue
+        if not _point_in_polygon(p.lat, p.lng, h["vertices"]):
+            continue
+        out.append({
+            "id": p.id,
+            "name": p.name,
+            "category": p.category,
+            "mcc_code": p.mcc_code,
+            "lat": p.lat,
+            "lng": p.lng,
+            "cashback_percent": p.cashback_percent,
+            "hex_id": p.hex_id,
+        })
+    return {"partners": out}
 
 
 @router.get("/player/{player_id}/profile")

@@ -96,7 +96,7 @@ def main():
     empty = sorted(all_ids - covered)
     print(f"empty hexes: {len(empty)}")
 
-    R = 0.009  # должен совпадать с seed_data
+    R = 0.008  # должен совпадать с seed_data.hex_grid_minsk
     added = 0
     for hid in empty:
         h = by_id[hid]

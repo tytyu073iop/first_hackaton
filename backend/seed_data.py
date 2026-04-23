@@ -16,7 +16,7 @@ def hex_grid_minsk():
     Для pointy-top соседние центры: dx = R*√3, dy = R*1.5, сдвиг рядов R*√3/2.
     """
     center_lat, center_lng = 53.9045, 27.5615
-    R = 0.0027
+    R = 0.008
     lat_scale = 1.0 / cos(radians(center_lat))  # расширение долготы
 
     hexes = []
@@ -42,7 +42,8 @@ def hex_grid_minsk():
         return h
 
     # axial-координаты, radius колец в гексах
-    grid_radius = 8
+    # radius=6 ≈ 9 км от центра — покрывает территорию внутри МКАД Минска
+    grid_radius = 6
     sqrt3 = sqrt(3)
     for q in range(-grid_radius, grid_radius + 1):
         r1 = max(-grid_radius, -q - grid_radius)
@@ -170,45 +171,102 @@ def _load_osm_partners():
         return None
 
 
-def seed_partners(session: Session):
-    """Создаёт партнёров. Если есть partners_osm.json — берём его (реальные точки
-    из OpenStreetMap). Иначе — встроенный PARTNERS_DATA.
-    hex_id вычисляется из lat/lng."""
+MAX_PARTNERS_PER_HEX = 3
+
+
+def _candidate_partners():
+    """Возвращает [(name, category, mcc, lat, lng, cashback), ...] —
+    OSM если доступен, иначе встроенный список."""
     osm = _load_osm_partners()
     if osm is not None:
+        out = []
         for item in osm:
             name = item.get("name")
             lat = item.get("lat")
             lng = item.get("lng")
             if not name or lat is None or lng is None:
                 continue
-            exists = session.query(Partner).filter(
-                Partner.name == name,
-                Partner.lat == lat,
-                Partner.lng == lng,
-            ).first()
-            if exists:
-                continue
-            hid = hex_id_for_point(lat, lng)
-            session.add(Partner(
-                hex_id=hid,
-                name=name,
-                category=item.get("category", "other"),
-                mcc_code=item.get("mcc_code", "5999"),
-                lat=lat,
-                lng=lng,
-                cashback_percent=float(item.get("cashback_percent", 0.0)),
+            out.append((
+                name,
+                item.get("category", "other"),
+                item.get("mcc_code", "5999"),
+                float(lat),
+                float(lng),
+                float(item.get("cashback_percent", 0.0)),
             ))
+        return out
+    return [(n, c, m, la, ln, cb) for (n, c, m, la, ln, cb) in PARTNERS_DATA]
+
+
+def _grid_is_stale(session: Session) -> bool:
+    """Если хоть у одного партнёра hex_id не совпадает с пересчитанным —
+    значит сетка изменилась и партнёров надо пересоздать."""
+    sample = session.query(Partner).limit(50).all()
+    if not sample:
+        return False
+    for p in sample:
+        if hex_id_for_point(p.lat, p.lng) != p.hex_id:
+            return True
+    return False
+
+
+def seed_partners(session: Session):
+    """Заполняет таблицу партнёров.
+
+    Правила:
+      - источник: partners_osm.json если есть, иначе PARTNERS_DATA;
+      - не более MAX_PARTNERS_PER_HEX партнёров на гекс (отбираем с
+        наибольшим cashback);
+      - в каждом гексе сетки минимум 1 партнёр — если из источника не
+        нашлось ни одного попадания, добавляем синтетического в центре.
+    Если сетка гексов поменялась относительно того, что в БД, — все
+    партнёры пересоздаются."""
+    if _grid_is_stale(session):
+        session.query(Partner).delete()
         session.commit()
+
+    have_any = session.query(Partner.id).first() is not None
+    if have_any:
         return
 
-    for name, cat, mcc, lat, lng, cb in PARTNERS_DATA:
-        exists = session.query(Partner).filter_by(name=name).first()
-        if exists:
-            continue
+    grid = hex_grid_minsk()
+    grid_ids = {h["hex_id"] for h in grid}
+
+    # 1) распределяем кандидатов по гексам, отбираем top-N по cashback
+    by_hex: dict[str, list[tuple]] = {}
+    for name, cat, mcc, lat, lng, cb in _candidate_partners():
         hid = hex_id_for_point(lat, lng)
+        if hid not in grid_ids:
+            continue
+        by_hex.setdefault(hid, []).append((name, cat, mcc, lat, lng, cb))
+
+    for hid, lst in by_hex.items():
+        lst.sort(key=lambda x: x[5], reverse=True)
+        for name, cat, mcc, lat, lng, cb in lst[:MAX_PARTNERS_PER_HEX]:
+            session.add(Partner(
+                hex_id=hid, name=name, category=cat, mcc_code=mcc,
+                lat=lat, lng=lng, cashback_percent=cb,
+            ))
+
+    # гарантируем минимум 1 партнёр в каждом гексе сетки
+    filled = set(by_hex.keys())
+    missing = [h for h in grid if h["hex_id"] not in filled]
+    synthetic_pool = [
+        ("МТБанк Экспресс", "other", "6011", 3.0),
+        ("Партнёрский магазин", "grocery", "5411", 2.0),
+        ("Кафе у дома", "restaurant", "5812", 3.5),
+        ("Заправка Партнёр", "fuel", "5541", 4.0),
+    ]
+    for i, h in enumerate(missing):
+        name, cat, mcc, cb = synthetic_pool[i % len(synthetic_pool)]
         session.add(Partner(
-            hex_id=hid, name=name, category=cat, mcc_code=mcc,
-            lat=lat, lng=lng, cashback_percent=cb,
+            hex_id=h["hex_id"],
+            name=f"{name} #{i + 1}",
+            category=cat,
+            mcc_code=mcc,
+            lat=h["center_lat"],
+            lng=h["center_lng"],
+            cashback_percent=cb,
         ))
+
     session.commit()

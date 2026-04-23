@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api")
 
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "demo-admin-token")
 
-HEX_TTL = timedelta(days=7)
+HEX_TTL = timedelta(minutes=0.5)
 
 
 def _active_unlock(db: Session, player_id: str, hex_id: str) -> PlayerProgress | None:
